@@ -93,7 +93,6 @@
     color: #0f0;
   }
 
-  /* 전화 오는 모달 */
   #incoming-call {
     position: fixed;
     top: 0; left: 0; right: 0;
@@ -141,7 +140,6 @@
     color: white;
   }
 
-  /* 통화 중 전체 화면 모달 */
   #in-call-fullscreen {
     position: fixed;
     top: 0; left: 0; right: 0; bottom: 0;
@@ -195,9 +193,7 @@
 </style>
 </head>
 <body>
-
 <div id="phone-number"></div>
-
 <div class="keypad">
   <button class="key">1</button>
   <button class="key">2</button>
@@ -212,7 +208,6 @@
   <button class="key">0</button>
   <button class="key">#</button>
 </div>
-
 <div class="actions">
   <button id="call-btn" disabled title="전화걸기">
     <i class="fas fa-phone"></i>
@@ -224,8 +219,6 @@
     <i class="fas fa-backspace"></i>
   </button>
 </div>
-
-<!-- 전화 오는 알림 모달 -->
 <div id="incoming-call">
   <div class="caller-id" id="caller-number">010-1234-5678</div>
   <div class="call-actions">
@@ -237,8 +230,6 @@
     </button>
   </div>
 </div>
-
-<!-- 통화 중 전체 화면 모달 -->
 <div id="in-call-fullscreen">
   <div class="caller-id" id="in-call-number"></div>
   <div class="status-text">통화 중...</div>
@@ -247,208 +238,143 @@
     <i class="fas fa-phone-slash"></i>
   </button>
 </div>
-
 <script>
-  const display = document.getElementById('phone-number');
-  const keys = document.querySelectorAll('.key');
-  const callBtn = document.getElementById('call-btn');
-  const clearBtn = document.getElementById('clear-btn');
-  const answerBtn = document.getElementById('answer-btn');
-
-  const incomingCall = document.getElementById('incoming-call');
-  const callerNumber = document.getElementById('caller-number');
-  const modalAnswerBtn = document.getElementById('modal-answer-btn');
-  const modalRejectBtn = document.getElementById('modal-reject-btn');
-
-  const inCallFull = document.getElementById('in-call-fullscreen');
-  const inCallNumber = document.getElementById('in-call-number');
-  const endCallBtn = document.getElementById('end-call-btn');
-  const callTimeDisplay = document.getElementById('call-time');
-  const statusText = document.querySelector('#in-call-fullscreen .status-text');
-
-  let phoneNumber = '';
-  let autoAnswerTimer = null;
-  let callTimer = null;
-  let callStartTime = null;
-  let callTimeInterval = null;
-
-  let callCycleTimer = null;
-
-  // 간단 벨음 재생 (Web Audio API)
-  let audioCtx = null;
-  function playBeep() {
-    if (!audioCtx) {
-      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    }
-    const oscillator = audioCtx.createOscillator();
-    oscillator.type = 'square';
-    oscillator.frequency.setValueAtTime(440, audioCtx.currentTime); // 440Hz (A4)
-    oscillator.connect(audioCtx.destination);
-    oscillator.start();
-    setTimeout(() => oscillator.stop(), 500);
-  }
-
-  function updateCallBtn() {
-    callBtn.disabled = phoneNumber.length < 1;
-  }
-
-  // 키 입력 이벤트
-  keys.forEach(key => {
-    key.addEventListener('click', () => {
-      if (phoneNumber.length >= 20) return;
-      phoneNumber += key.textContent;
-      display.textContent = phoneNumber;
-      updateCallBtn();
-    });
-  });
-
-  // 지우기
-  clearBtn.addEventListener('click', () => {
-    phoneNumber = phoneNumber.slice(0, -1);
+const callers = [
+  { name: '김주임', sound: 'call1.mp3' },
+  { name: '박대리', sound: 'call2.mp3' },
+  { name: '인턴사원 윤예린', sound: 'call3.mp3' },
+];
+const display = document.getElementById('phone-number');
+const keys = document.querySelectorAll('.key');
+const callBtn = document.getElementById('call-btn');
+const clearBtn = document.getElementById('clear-btn');
+const answerBtn = document.getElementById('answer-btn');
+const incomingCall = document.getElementById('incoming-call');
+const callerNumber = document.getElementById('caller-number');
+const modalAnswerBtn = document.getElementById('modal-answer-btn');
+const modalRejectBtn = document.getElementById('modal-reject-btn');
+const inCallFull = document.getElementById('in-call-fullscreen');
+const inCallNumber = document.getElementById('in-call-number');
+const endCallBtn = document.getElementById('end-call-btn');
+const callTimeDisplay = document.getElementById('call-time');
+const statusText = document.querySelector('#in-call-fullscreen .status-text');
+let phoneNumber = '';
+let currentSound = null;
+let callTimer = null;
+let callTimeInterval = null;
+let callStartTime = null;
+let autoAnswerTimer = null;
+let callCycleTimer = null;
+let audioCtx = null;
+function playBeep() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  const oscillator = audioCtx.createOscillator();
+  oscillator.type = 'square';
+  oscillator.frequency.setValueAtTime(440, audioCtx.currentTime);
+  oscillator.connect(audioCtx.destination);
+  oscillator.start();
+  setTimeout(() => oscillator.stop(), 500);
+}
+function updateCallBtn() {
+  callBtn.disabled = phoneNumber.length < 1;
+}
+keys.forEach(key => {
+  key.addEventListener('click', () => {
+    if (phoneNumber.length >= 20) return;
+    phoneNumber += key.textContent;
     display.textContent = phoneNumber;
     updateCallBtn();
   });
-
-  // 키패드 초기화
-  function resetToKeypad() {
-    phoneNumber = '';
-    display.textContent = '';
-    updateCallBtn();
-    incomingCall.classList.remove('show');
-    inCallFull.classList.remove('show');
-    answerBtn.style.display = 'none';
-  }
-
-  // 전화 걸기
-  callBtn.addEventListener('click', () => {
-    if (phoneNumber.length < 1) return;
-    startCall(phoneNumber);
-  });
-
-  // 전화 받기 버튼 (상단 바로 받기)
-  answerBtn.addEventListener('click', () => {
-    answerCall();
-  });
-
-  // 모달에서 받기 버튼
-  modalAnswerBtn.addEventListener('click', () => {
-    answerCall();
-  });
-
-  // 모달에서 거절 버튼
-  modalRejectBtn.addEventListener('click', () => {
-    rejectCall();
-  });
-
-  // 통화 종료 버튼
-  endCallBtn.addEventListener('click', () => {
-    endCall();
-  });
-
-  // 통화 시작 함수
-  function startCall(number) {
+});
+clearBtn.addEventListener('click', () => {
+  phoneNumber = phoneNumber.slice(0, -1);
+  display.textContent = phoneNumber;
+  updateCallBtn();
+});
+function resetToKeypad() {
+  phoneNumber = '';
+  display.textContent = '';
+  updateCallBtn();
+  incomingCall.classList.remove('show');
+  inCallFull.classList.remove('show');
+  answerBtn.style.display = 'none';
+}
+callBtn.addEventListener('click', () => {
+  if (phoneNumber.length < 1) return;
+  startCall(phoneNumber);
+});
+answerBtn.addEventListener('click', () => { answerCall(); });
+modalAnswerBtn.addEventListener('click', () => { answerCall(); });
+modalRejectBtn.addEventListener('click', () => { rejectCall(); });
+endCallBtn.addEventListener('click', () => { endCall(); });
+function startCall(name) {
   callBtn.disabled = true;
   clearBtn.disabled = true;
-  answerBtn.style.display = 'none';
-
-  inCallNumber.textContent = number;
+  inCallNumber.textContent = name;
   statusText.textContent = '통화 중...';
   callTimeDisplay.textContent = '0초';
-
   inCallFull.classList.add('show');
   callStartTime = Date.now();
-
-  // 통화 시간 타이머 시작
   callTimeInterval = setInterval(() => {
     const elapsed = Math.floor((Date.now() - callStartTime) / 1000);
     callTimeDisplay.textContent = `${elapsed}초`;
   }, 1000);
-
-  // 🔴 10초 후 자동 종료
-  callTimer = setTimeout(() => {
-    endCall();
-  }, 10000);
+  callTimer = setTimeout(() => { endCall(); }, 40000);
 }
-
-
-  // 통화 종료 함수
-  function endCall() {
-    clearInterval(callTimeInterval);
-    clearTimeout(callTimer);
-
-    const elapsedSec = Math.floor((Date.now() - callStartTime) / 1000);
-
-    // 상태 텍스트를 '통화 종료'로 변경
-    statusText.textContent = '통화 종료';
-
-    // 통화 시간 유지
-    callTimeDisplay.textContent = `${elapsedSec}초`;
-
-    // 통화 종료 버튼 숨기기
-    endCallBtn.style.display = 'none';
-
-    // 3초 후 초기화 및 통화 종료 버튼 재표시
-    setTimeout(() => {
-      resetToKeypad();
-      startCallCycle();
-      endCallBtn.style.display = 'flex';
-    }, 3000);
+function endCall() {
+  clearInterval(callTimeInterval);
+  clearTimeout(callTimer);
+  if (currentSound) {
+    currentSound.pause();
+    currentSound.currentTime = 0;
   }
-
-  // 전화 받기 함수
-  function answerCall() {
-    // 모달 숨기기
-    incomingCall.classList.remove('show');
-    answerBtn.style.display = 'none';
-
-    // 통화 시작
-    startCall(callerNumber.textContent);
-  }
-
-  // 전화 거절 함수
-  function rejectCall() {
-    clearTimeout(autoAnswerTimer);
-    incomingCall.classList.remove('show');
-    answerBtn.style.display = 'none';
+  const elapsedSec = Math.floor((Date.now() - callStartTime) / 1000);
+  statusText.textContent = '통화 종료';
+  callTimeDisplay.textContent = `${elapsedSec}초`;
+  endCallBtn.style.display = 'none';
+  setTimeout(() => {
     resetToKeypad();
-    startCallCycle();
-  }
-
-  // 자동 전화 사이클 시작
-  function startCallCycle() {
-    callCycleTimer = setTimeout(() => {
-      const randomNumber = generateRandomNumber();
-      callerNumber.textContent = randomNumber;
-      incomingCall.classList.add('show');
-      answerBtn.style.display = 'inline-block';
-
-      // 벨 울림 (5초간)
-      let count = 0;
-      const beepInterval = setInterval(() => {
-        playBeep();
-        count++;
-        if (count >= 5) clearInterval(beepInterval);
-      }, 1000);
-
-      // 5초 후 자동 수신 (answer)
-      autoAnswerTimer = setTimeout(() => {
-        if (incomingCall.classList.contains('show')) {
-          answerCall();
-        }
-      }, 5000);
-    }, 1500);
-  }
-
-  // 번호 생성 함수 (010-XXXX-XXXX)
-  function generateRandomNumber() {
-    const getNum = () => Math.floor(Math.random() * 10000).toString().padStart(4, '0');
-    return `010-${getNum()}-${getNum()}`;
-  }
-
-  // 초기 시작
+    endCallBtn.style.display = 'flex';
+    setTimeout(startCallCycle, 3 * 60 * 1000);
+  }, 3000);
+}
+function answerCall() {
+  incomingCall.classList.remove('show');
+  answerBtn.style.display = 'none';
+  const caller = callers.find(c => c.name === callerNumber.textContent);
+  if (caller) playSound(caller.sound);
+  startCall(callerNumber.textContent);
+}
+function rejectCall() {
+  clearTimeout(autoAnswerTimer);
+  incomingCall.classList.remove('show');
+  answerBtn.style.display = 'none';
   resetToKeypad();
-  startCallCycle();
+  setTimeout(startCallCycle, 3 * 60 * 1000);
+}
+function startCallCycle() {
+  callCycleTimer = setTimeout(() => {
+    const randomCaller = callers[Math.floor(Math.random() * callers.length)];
+    callerNumber.textContent = randomCaller.name;
+    incomingCall.classList.add('show');
+    answerBtn.style.display = 'inline-block';
+    let count = 0;
+    const beepInterval = setInterval(() => {
+      playBeep();
+      count++;
+      if (count >= 5) clearInterval(beepInterval);
+    }, 1000);
+    autoAnswerTimer = setTimeout(() => {
+      if (incomingCall.classList.contains('show')) answerCall();
+    }, 5000);
+  }, 1000);
+}
+function playSound(file) {
+  currentSound = new Audio(file);
+  currentSound.play();
+}
+resetToKeypad();
+startCallCycle();
 </script>
-
 </body>
 </html>
