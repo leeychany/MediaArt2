@@ -244,6 +244,7 @@ const callers = [
   { name: '박대리', sound: 'call2.wav' },
   { name: '인턴사원 윤예린', sound: 'call3.wav' },
 ];
+
 const display = document.getElementById('phone-number');
 const keys = document.querySelectorAll('.key');
 const callBtn = document.getElementById('call-btn');
@@ -258,6 +259,7 @@ const inCallNumber = document.getElementById('in-call-number');
 const endCallBtn = document.getElementById('end-call-btn');
 const callTimeDisplay = document.getElementById('call-time');
 const statusText = document.querySelector('#in-call-fullscreen .status-text');
+
 let phoneNumber = '';
 let currentSound = null;
 let callTimer = null;
@@ -266,18 +268,46 @@ let callStartTime = null;
 let autoAnswerTimer = null;
 let callCycleTimer = null;
 let audioCtx = null;
+let ringtoneInterval = null;
+
 function playBeep() {
   if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
   const oscillator = audioCtx.createOscillator();
+  const gainNode = audioCtx.createGain();
+
   oscillator.type = 'square';
   oscillator.frequency.setValueAtTime(440, audioCtx.currentTime);
-  oscillator.connect(audioCtx.destination);
+
+  oscillator.connect(gainNode);
+  gainNode.connect(audioCtx.destination);
+
+  gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime); // 볼륨 조절 (0.0 ~ 1.0)
+
   oscillator.start();
   setTimeout(() => oscillator.stop(), 500);
 }
+
+
+function startRingtone() {
+  if (ringtoneInterval) return; // 이미 울리고 있으면 중복 시작 방지
+  playBeep();
+  ringtoneInterval = setInterval(() => {
+    playBeep();
+  }, 1000);
+}
+
+function stopRingtone() {
+  if (ringtoneInterval) {
+    clearInterval(ringtoneInterval);
+    ringtoneInterval = null;
+  }
+}
+
 function updateCallBtn() {
   callBtn.disabled = phoneNumber.length < 1;
 }
+
 keys.forEach(key => {
   key.addEventListener('click', () => {
     if (phoneNumber.length >= 20) return;
@@ -286,11 +316,13 @@ keys.forEach(key => {
     updateCallBtn();
   });
 });
+
 clearBtn.addEventListener('click', () => {
   phoneNumber = phoneNumber.slice(0, -1);
   display.textContent = phoneNumber;
   updateCallBtn();
 });
+
 function resetToKeypad() {
   phoneNumber = '';
   display.textContent = '';
@@ -298,15 +330,19 @@ function resetToKeypad() {
   incomingCall.classList.remove('show');
   inCallFull.classList.remove('show');
   answerBtn.style.display = 'none';
+  stopRingtone();
 }
+
 callBtn.addEventListener('click', () => {
   if (phoneNumber.length < 1) return;
   startCall(phoneNumber);
 });
+
 answerBtn.addEventListener('click', () => { answerCall(); });
 modalAnswerBtn.addEventListener('click', () => { answerCall(); });
 modalRejectBtn.addEventListener('click', () => { rejectCall(); });
 endCallBtn.addEventListener('click', () => { endCall(); });
+
 function startCall(name) {
   callBtn.disabled = true;
   clearBtn.disabled = true;
@@ -321,6 +357,7 @@ function startCall(name) {
   }, 1000);
   callTimer = setTimeout(() => { endCall(); }, 40000);
 }
+
 function endCall() {
   clearInterval(callTimeInterval);
   clearTimeout(callTimer);
@@ -338,41 +375,45 @@ function endCall() {
     setTimeout(startCallCycle, 3 * 60 * 1000);
   }, 3000);
 }
+
 function answerCall() {
+  stopRingtone();
   incomingCall.classList.remove('show');
   answerBtn.style.display = 'none';
   const caller = callers.find(c => c.name === callerNumber.textContent);
   if (caller) playSound(caller.sound);
   startCall(callerNumber.textContent);
 }
+
 function rejectCall() {
+  stopRingtone();
   clearTimeout(autoAnswerTimer);
   incomingCall.classList.remove('show');
   answerBtn.style.display = 'none';
   resetToKeypad();
   setTimeout(startCallCycle, 3 * 60 * 1000);
 }
+
 function startCallCycle() {
   callCycleTimer = setTimeout(() => {
     const randomCaller = callers[Math.floor(Math.random() * callers.length)];
     callerNumber.textContent = randomCaller.name;
     incomingCall.classList.add('show');
     answerBtn.style.display = 'inline-block';
-    let count = 0;
-    const beepInterval = setInterval(() => {
-      playBeep();
-      count++;
-      if (count >= 5) clearInterval(beepInterval);
-    }, 1000);
+
+    startRingtone();
+
     autoAnswerTimer = setTimeout(() => {
       if (incomingCall.classList.contains('show')) answerCall();
     }, 5000);
   }, 1000);
 }
+
 function playSound(file) {
   currentSound = new Audio(file);
   currentSound.play();
 }
+
 resetToKeypad();
 startCallCycle();
 </script>
