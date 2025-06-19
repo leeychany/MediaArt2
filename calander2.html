@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+<title>2025년 7월 캘린더 - 자동 입력</title>
+<style>
+  * {
+    box-sizing: border-box;
+  }
+  body, html {
+    margin: 0; padding: 0;
+    height: 100vh;
+    width: 100vw;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen,
+      Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
+    background: #fdfdfd;
+    display: flex;
+    flex-direction: column;
+  }
+
+  header {
+    padding: 1rem;
+    text-align: center;
+    font-weight: 700;
+    font-size: 2.2rem;
+    background: #0078d7;
+    color: white;
+  }
+
+  main {
+    flex: 1;
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    grid-auto-rows: minmax(60px, 1fr);
+    gap: 1px;
+    background: #ddd;
+    user-select: none;
+  }
+
+  .weekday {
+    background: #0078d7;
+    color: white;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-weight: 600;
+    font-size: 1.1rem;
+  }
+
+  .date-cell {
+    background: white;
+    padding: 0.5rem;
+    display: flex;
+    justify-content: flex-start;
+    align-items: flex-start;
+    font-size: 1rem;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+  }
+  .date-cell[contenteditable="true"] {
+    outline: 2px solid #0078d7;
+    cursor: text;
+  }
+
+  .date-number {
+    font-weight: 600;
+    user-select: none;
+  }
+
+  .date-content {
+    margin-left: 0.4rem;
+    flex: 1;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  @media (orientation: portrait) {
+    main {
+      grid-auto-rows: minmax(80px, 1fr);
+    }
+  }
+</style>
+</head>
+<body>
+
+<header>2025년 7월</header>
+
+<main id="calendar">
+  <div class="weekday">일</div>
+  <div class="weekday">월</div>
+  <div class="weekday">화</div>
+  <div class="weekday">수</div>
+  <div class="weekday">목</div>
+  <div class="weekday">금</div>
+  <div class="weekday">토</div>
+</main>
+
+<script>
+  const calendar = document.getElementById('calendar');
+  const year = 2025;
+  const month = 6; // 7월 (0-based)
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = 31;
+
+  const autoTextsByDate = {
+    1: "하반기 인사평가 준비 시작",
+    3: "외부 강연 일정 체크",
+    5: "성과 공유회 기획 회의",
+    8: "연차자 명단 확정 및 공지",
+    10: "팀별 업무 조정 회의",
+    12: "신규 채용 공고 초안 작성",
+    15: "채용 포스터 최종 검토",
+    17: "사내 복지 프로그램 의견 수렴 시작",
+    19: "퇴사 예정자 인수인계 검토",
+    22: "인사제도 변경 관련 자료 제출 기한",
+    24: "성과 평가 1차 자료 마감",
+    26: "간부 대상 리더십 워크숍",
+    29: "워크숍 피드백 정리 및 배포",
+    31: "8월 일정 사전 조율 회의"
+  };
+
+  for (let i = 0; i < firstDay; i++) {
+    const emptyCell = document.createElement('div');
+    emptyCell.classList.add('date-cell');
+    emptyCell.style.background = '#f0f0f0';
+    calendar.appendChild(emptyCell);
+  }
+
+  const dateCells = [];
+  for (let day = 1; day <= daysInMonth; day++) {
+    const cell = document.createElement('div');
+    cell.classList.add('date-cell');
+    cell.setAttribute('tabindex', 0);
+
+    const dateNumber = document.createElement('div');
+    dateNumber.classList.add('date-number');
+    dateNumber.textContent = day;
+    cell.appendChild(dateNumber);
+
+    const content = document.createElement('div');
+    content.classList.add('date-content');
+    content.setAttribute('contenteditable', 'false');
+    content.setAttribute('aria-label', `2025년 7월 ${day}일 일정`);
+    cell.appendChild(content);
+
+    cell.addEventListener('click', () => {
+      if (content.getAttribute('contenteditable') === 'false') {
+        content.setAttribute('contenteditable', 'true');
+        content.focus();
+        document.execCommand('selectAll', false, null);
+        document.getSelection().collapseToEnd();
+      }
+    });
+    content.addEventListener('blur', () => {
+      content.setAttribute('contenteditable', 'false');
+    });
+    content.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        content.blur();
+      }
+    });
+
+    calendar.appendChild(cell);
+    dateCells.push({day, content});
+  }
+
+  async function typeText(element, text, speed=80) {
+    for (let i = 0; i < text.length; i++) {
+      element.textContent += text[i];
+      await new Promise(r => setTimeout(r, speed));
+    }
+  }
+
+  async function autoFillLoop() {
+    const datesWithText = Object.keys(autoTextsByDate).map(Number).sort((a,b)=>a-b);
+    while (true) {
+      for (const date of datesWithText) {
+        const cellObj = dateCells.find(c => c.day === date);
+        if (!cellObj) continue;
+        const content = cellObj.content;
+        const text = autoTextsByDate[date];
+        await typeText(content, text, 80);
+        await new Promise(r => setTimeout(r, 1500));
+      }
+
+      for (const date of datesWithText) {
+        const cellObj = dateCells.find(c => c.day === date);
+        if (cellObj) cellObj.content.textContent = "";
+      }
+
+      await new Promise(r => setTimeout(r, 1000));
+    }
+  }
+
+  autoFillLoop();
+
+</script>
+
+</body>
+</html>
